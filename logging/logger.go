@@ -16,10 +16,7 @@ func Init() {
 }
 
 func Sync() {
-	err := RootLogger.Sync()
-	if err != nil {
-		panic(fmt.Sprintf("error syncing logger: %s", err.Error()))
-	}
+	_ = RootLogger.Sync()
 }
 
 func GetForComponent(component string) *zap.SugaredLogger {
