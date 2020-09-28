@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 var ErrParamNotFound = errors.New("param not found")
+var ErrInvalidType = errors.New("invalid type")
 
 type Parser struct {
 	providers []Provider
@@ -40,6 +42,39 @@ func (parser *Parser) GetParam(name string) (string, error) {
 	return val, err
 }
 
+func (parser *Parser) convertTo(value string, targetType string) (interface{}, error) {
+	switch targetType {
+	case "string":
+		return value, nil
+	case "int":
+		return strconv.Atoi(value)
+	case "int8":
+		return strconv.ParseInt(value, 10, 8)
+	case "int16":
+		return strconv.ParseInt(value, 10, 16)
+	case "int32":
+		return strconv.ParseInt(value, 10, 32)
+	case "int64":
+		return strconv.ParseInt(value, 10, 64)
+	case "uint8":
+		return strconv.ParseUint(value, 10, 8)
+	case "uint16":
+		return strconv.ParseUint(value, 10, 16)
+	case "uint32":
+		return strconv.ParseUint(value, 10, 32)
+	case "uint64":
+		return strconv.ParseUint(value, 10, 64)
+	case "float32":
+		return strconv.ParseFloat(value, 32)
+	case "float64":
+		return strconv.ParseFloat(value, 64)
+	case "bool":
+		return strconv.ParseBool(value)
+	default:
+		return nil, fmt.Errorf("unknown type %s: %w", targetType, ErrInvalidType)
+	}
+}
+
 func (parser *Parser) Populate(config interface{}) error {
 	v := reflect.ValueOf(config).Elem()
 
@@ -63,7 +98,13 @@ func (parser *Parser) Populate(config interface{}) error {
 			}
 		}
 
-		v.Field(i).Set(reflect.ValueOf(val).Convert(field.Type))
+		convertedVal, err := parser.convertTo(val, v.Field(i).Type().String())
+
+		if err != nil {
+			return fmt.Errorf("error while populating field %s: %w", fieldName, err)
+		}
+
+		v.Field(i).Set(reflect.ValueOf(convertedVal).Convert(field.Type))
 	}
 
 	return nil
