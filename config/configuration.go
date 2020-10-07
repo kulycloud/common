@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 var ErrParamNotFound = errors.New("param not found")
@@ -70,6 +71,8 @@ func (parser *Parser) convertTo(value string, targetType string) (interface{}, e
 		return strconv.ParseFloat(value, 64)
 	case "bool":
 		return strconv.ParseBool(value)
+	case "[]string":
+		return strings.Split(value, ","), nil
 	default:
 		return nil, fmt.Errorf("unknown type %s: %w", targetType, ErrInvalidType)
 	}
