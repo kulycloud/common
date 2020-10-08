@@ -66,3 +66,27 @@ func (communicator *Communicator) SetRouteByUID(ctx context.Context, UID string,
 
 	return resp.Uid, nil
 }
+
+func (communicator *Communicator) GetRouteStepByNamespacedName(ctx context.Context, namespace string, name string, stepId uint32) (*protoStorage.RouteStep, error) {
+	resp, err := communicator.client.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}}, StepId: stepId})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Step, nil
+}
+
+
+func (communicator *Communicator) GetRouteStepByUID(ctx context.Context, UID string, stepId uint32) (*protoStorage.RouteStep, error) {
+	resp, err := communicator.client.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Step, nil
+}
