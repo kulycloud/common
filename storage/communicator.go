@@ -9,20 +9,21 @@ import (
 )
 
 type Communicator struct {
-	client protoStorage.StorageClient
+	componentClient protoCommon.ComponentClient
+	storageClient   protoStorage.StorageClient
 }
 
 func NewCommunicator(grpcClient grpc.ClientConnInterface) *Communicator {
-	return &Communicator{client: protoStorage.NewStorageClient(grpcClient)}
+	return &Communicator{componentClient: protoCommon.NewComponentClient(grpcClient), storageClient: protoStorage.NewStorageClient(grpcClient)}
 }
 
 func (communicator *Communicator) Check(ctx context.Context) error {
-	_, err := communicator.client.Ping(ctx, &protoCommon.Empty{})
+	_, err := communicator.componentClient.Ping(ctx, &protoCommon.Empty{})
 	return err
 }
 
 func (communicator *Communicator) GetRouteByNamespacedName(ctx context.Context, namespace string, name string) (*protoStorage.RouteWithId, error) {
-	resp, err := communicator.client.GetRoute(ctx, &protoStorage.GetRouteRequest{Id: &protoStorage.GetRouteRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+	resp, err := communicator.storageClient.GetRoute(ctx, &protoStorage.GetRouteRequest{Id: &protoStorage.GetRouteRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}}})
@@ -35,7 +36,7 @@ func (communicator *Communicator) GetRouteByNamespacedName(ctx context.Context, 
 }
 
 func (communicator *Communicator) GetRouteByUID(ctx context.Context, UID string) (*protoStorage.RouteWithId, error) {
-	resp, err := communicator.client.GetRoute(ctx, &protoStorage.GetRouteRequest{Id: &protoStorage.GetRouteRequest_Uid{Uid: UID}})
+	resp, err := communicator.storageClient.GetRoute(ctx, &protoStorage.GetRouteRequest{Id: &protoStorage.GetRouteRequest_Uid{Uid: UID}})
 
 	if err != nil {
 		return nil, fmt.Errorf("error from storage provider: %w", err)
@@ -45,7 +46,7 @@ func (communicator *Communicator) GetRouteByUID(ctx context.Context, UID string)
 }
 
 func (communicator *Communicator) SetRouteByNamespacedName(ctx context.Context, namespace string, name string, route *protoStorage.Route) (string, error) {
-	resp, err := communicator.client.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+	resp, err := communicator.storageClient.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}}, Data: route})
@@ -58,7 +59,7 @@ func (communicator *Communicator) SetRouteByNamespacedName(ctx context.Context, 
 }
 
 func (communicator *Communicator) SetRouteByUID(ctx context.Context, UID string, route *protoStorage.Route) (string, error) {
-	resp, err := communicator.client.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_Uid{Uid: UID}, Data: route})
+	resp, err := communicator.storageClient.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_Uid{Uid: UID}, Data: route})
 
 	if err != nil {
 		return "", fmt.Errorf("error from storage provider: %w", err)
@@ -68,7 +69,7 @@ func (communicator *Communicator) SetRouteByUID(ctx context.Context, UID string,
 }
 
 func (communicator *Communicator) GetRouteStepByNamespacedName(ctx context.Context, namespace string, name string, stepId uint32) (*protoStorage.RouteStep, error) {
-	resp, err := communicator.client.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+	resp, err := communicator.storageClient.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}}, StepId: stepId})
@@ -82,7 +83,7 @@ func (communicator *Communicator) GetRouteStepByNamespacedName(ctx context.Conte
 
 
 func (communicator *Communicator) GetRouteStepByUID(ctx context.Context, UID string, stepId uint32) (*protoStorage.RouteStep, error) {
-	resp, err := communicator.client.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
+	resp, err := communicator.storageClient.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
 
 	if err != nil {
 		return nil, fmt.Errorf("error from storage provider: %w", err)
