@@ -3,23 +3,18 @@ package storage
 import (
 	"context"
 	"fmt"
-	protoCommon "github.com/kulycloud/protocol/common"
+	commonCommunication "github.com/kulycloud/common/communication"
 	protoStorage "github.com/kulycloud/protocol/storage"
-	"google.golang.org/grpc"
 )
 
+var _ commonCommunication.RemoteComponent = &Communicator{}
 type Communicator struct {
-	componentClient protoCommon.ComponentClient
+	commonCommunication.ComponentCommunicator
 	storageClient   protoStorage.StorageClient
 }
 
-func NewCommunicator(grpcClient grpc.ClientConnInterface) *Communicator {
-	return &Communicator{componentClient: protoCommon.NewComponentClient(grpcClient), storageClient: protoStorage.NewStorageClient(grpcClient)}
-}
-
-func (communicator *Communicator) Check(ctx context.Context) error {
-	_, err := communicator.componentClient.Ping(ctx, &protoCommon.Empty{})
-	return err
+func NewCommunicator(componentCommunicator *commonCommunication.ComponentCommunicator) *Communicator {
+	return &Communicator{ComponentCommunicator: *componentCommunicator, storageClient: protoStorage.NewStorageClient(componentCommunicator.GrpcClient)}
 }
 
 func (communicator *Communicator) GetRouteByNamespacedName(ctx context.Context, namespace string, name string) (*protoStorage.RouteWithId, error) {
