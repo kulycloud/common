@@ -8,16 +8,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Communicator struct {
+type ControlPlaneCommunicator struct {
 	connection *grpc.ClientConn
 	controlPlaneClient protoControlPlane.ControlPlaneClient
 }
 
-func NewCommunicator() *Communicator {
-	return &Communicator{}
+func NewControlPlaneCommunicator() *ControlPlaneCommunicator {
+	return &ControlPlaneCommunicator{}
 }
 
-func (communicator *Communicator) Connect(host string, port uint32) error {
+func (communicator *ControlPlaneCommunicator) Connect(host string, port uint32) error {
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%v", host, port), grpc.WithInsecure())
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func (communicator *Communicator) Connect(host string, port uint32) error {
 	return nil
 }
 
-func (communicator *Communicator) RegisterThisService(ctx context.Context, typeName string, ownHost string, ownPort uint32 ) error {
+func (communicator *ControlPlaneCommunicator) RegisterThisService(ctx context.Context, typeName string, ownHost string, ownPort uint32 ) error {
 	_, err := communicator.controlPlaneClient.RegisterComponent(ctx, &protoControlPlane.RegisterComponentRequest {
 		Type:     typeName,
 		Endpoint: &protoCommon.Endpoint{
