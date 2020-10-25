@@ -57,20 +57,10 @@ func (communicator *StorageCommunicator) GetRouteByUID(ctx context.Context, UID 
 }
 
 func (communicator *StorageCommunicator) SetRouteByNamespacedName(ctx context.Context, namespace string, name string, route *protoStorage.Route) (string, error) {
-	resp, err := communicator.storageClient.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+	resp, err := communicator.storageClient.SetRoute(ctx, &protoStorage.SetRouteRequest{NamespacedName: &protoStorage.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
-	}}, Data: route})
-
-	if err != nil {
-		return "", fmt.Errorf("error from storage provider: %w", err)
-	}
-
-	return resp.Uid, nil
-}
-
-func (communicator *StorageCommunicator) SetRouteByUID(ctx context.Context, UID string, route *protoStorage.Route) (string, error) {
-	resp, err := communicator.storageClient.SetRoute(ctx, &protoStorage.SetRouteRequest{Id: &protoStorage.SetRouteRequest_Uid{Uid: UID}, Data: route})
+	}, Data: route})
 
 	if err != nil {
 		return "", fmt.Errorf("error from storage provider: %w", err)
@@ -101,4 +91,60 @@ func (communicator *StorageCommunicator) GetRouteStepByUID(ctx context.Context, 
 	}
 
 	return resp.Step, nil
+}
+
+func (communicator *StorageCommunicator) GetRoutesInNamespace(ctx context.Context, namespace string) ([]string, error) {
+	resp, err := communicator.storageClient.GetRoutesInNamespace(ctx, &protoStorage.GetRoutesInNamespaceRequest{Namespace: namespace})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Routes, nil
+}
+
+func (communicator *StorageCommunicator) GetRouteStart(ctx context.Context, host string) (*protoStorage.GetRouteStartResponse, error) {
+	resp, err := communicator.storageClient.GetRouteStart(ctx, &protoStorage.GetRouteStartRequest{Host: host})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp, nil
+}
+
+func (communicator *StorageCommunicator) GetService(ctx context.Context, namespace string, name string) (*protoStorage.Service, error) {
+	resp, err := communicator.storageClient.GetService(ctx, &protoStorage.GetServiceRequest{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Service, nil
+}
+
+func (communicator *StorageCommunicator) SetService(ctx context.Context, namespace string, name string, service *protoStorage.Service) error {
+	_, err := communicator.storageClient.SetService(ctx, &protoStorage.SetServiceRequest{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}, Service: service})
+
+	if err != nil {
+		return fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return nil
+}
+
+func (communicator *StorageCommunicator) GetServicesInNamespace(ctx context.Context, namespace string) ([]string, error) {
+	resp, err := communicator.storageClient.GetServicesInNamespace(ctx, &protoStorage.GetServicesInNamespaceRequest{Namespace: namespace})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Names, nil
 }
