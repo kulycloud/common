@@ -46,6 +46,7 @@ func (listener *Listener) Serve() error {
 
 var _ protoCommon.ComponentServer = &componentHandler{}
 type componentHandler struct {
+	protoCommon.UnimplementedComponentServer
 	listener *Listener
 }
 
