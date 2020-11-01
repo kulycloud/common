@@ -3,6 +3,7 @@ package communication
 import (
 	"context"
 	"fmt"
+	protoCommon "github.com/kulycloud/protocol/common"
 	protoStorage "github.com/kulycloud/protocol/storage"
 )
 
@@ -147,4 +148,24 @@ func (communicator *StorageCommunicator) GetServicesInNamespace(ctx context.Cont
 	}
 
 	return resp.Names, nil
+}
+
+func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Context, namespacedName *protoStorage.NamespacedName) ([]*protoCommon.Endpoint, error) {
+	resp, err := communicator.storageClient.GetServiceLBEndpoints(ctx, namespacedName)
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Endpoints, nil
+}
+
+func (communicator *StorageCommunicator) SetServiceLBEndpoints(ctx context.Context, namespacedName *protoStorage.NamespacedName, endpoints []*protoCommon.Endpoint) error {
+	_, err := communicator.storageClient.SetServiceLBEndpoints(ctx, &protoStorage.SetServiceLBEndpointsRequest{ServiceName: namespacedName, Endpoints: endpoints})
+
+	if err != nil {
+		return fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return nil
 }
