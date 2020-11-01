@@ -11,6 +11,7 @@ var _ RemoteComponent = &StorageCommunicator{}
 type StorageCommunicator struct {
 	ComponentCommunicator
 	storageClient   protoStorage.StorageClient
+	Endpoints 		[]*protoCommon.Endpoint
 }
 
 func NewEmptyStorageCommunicator() *StorageCommunicator {

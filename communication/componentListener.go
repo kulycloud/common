@@ -55,7 +55,7 @@ func (handler *componentHandler) Ping(ctx context.Context, empty *protoCommon.Em
 }
 
 func (handler *componentHandler) RegisterStorageEndpoints(ctx context.Context, endpoints *protoCommon.EndpointList) (*protoCommon.Empty, error) {
-	// we currently only support a single endpoint
+	// This logic will change when supporting multiple endpoints (tracked in KU-50)
 	var comm *ComponentCommunicator = nil
 	var err error = nil
 
@@ -68,10 +68,13 @@ func (handler *componentHandler) RegisterStorageEndpoints(ctx context.Context, e
 				// We cannot ping the new storage. We should explicitly set it to nil
 				comm = nil
 			}
+		} else {
+			comm = nil
 		}
 	}
 
 	handler.listener.Storage.UpdateComponentCommunicator(comm)
+	handler.listener.Storage.Endpoints = endpoints.Endpoints
 
 	if err == nil {
 		for _, handler := range handler.listener.NewStorageHandlers {
