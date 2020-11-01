@@ -150,8 +150,11 @@ func (communicator *StorageCommunicator) GetServicesInNamespace(ctx context.Cont
 	return resp.Names, nil
 }
 
-func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Context, namespacedName *protoStorage.NamespacedName) ([]*protoCommon.Endpoint, error) {
-	resp, err := communicator.storageClient.GetServiceLBEndpoints(ctx, namespacedName)
+func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Context, namespace string, name string,) ([]*protoCommon.Endpoint, error) {
+	resp, err := communicator.storageClient.GetServiceLBEndpoints(ctx, &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("error from storage provider: %w", err)
@@ -160,8 +163,11 @@ func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Conte
 	return resp.Endpoints, nil
 }
 
-func (communicator *StorageCommunicator) SetServiceLBEndpoints(ctx context.Context, namespacedName *protoStorage.NamespacedName, endpoints []*protoCommon.Endpoint) error {
-	_, err := communicator.storageClient.SetServiceLBEndpoints(ctx, &protoStorage.SetServiceLBEndpointsRequest{ServiceName: namespacedName, Endpoints: endpoints})
+func (communicator *StorageCommunicator) SetServiceLBEndpoints(ctx context.Context, namespace string, name string, endpoints []*protoCommon.Endpoint) error {
+	_, err := communicator.storageClient.SetServiceLBEndpoints(ctx, &protoStorage.SetServiceLBEndpointsRequest{ServiceName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}, Endpoints: endpoints})
 
 	if err != nil {
 		return fmt.Errorf("error from storage provider: %w", err)
