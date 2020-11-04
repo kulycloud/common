@@ -18,8 +18,8 @@ type HttpResponse struct {
 	*bodyWrapper
 }
 
-const MAX_CHUNK_SIZE = 1024
-const MAX_CHUNK_COUNT = 1024
+const MAX_CHUNK_SIZE = 4096
+const MAX_CHUNK_COUNT = 4096
 
 type bodyWrapper struct {
 	body chan []byte
