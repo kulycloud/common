@@ -25,12 +25,15 @@ func (server *HttpServer) Register(listener *communication.Listener) {
 	protoHttp.RegisterHttpServer(listener.Server, server)
 }
 
-func (server *HttpServer) ProcessRoute(grpcStream protoHttp.Http_ProcessRequestServer) error {
-	request, err := receiveRequest(grpcStream)
+func (server *HttpServer) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
+	request := newEmptyHttpRequest()
+	err := receive(grpcStream, request)
 	if err != nil {
 		return err
 	}
 	response := server.handler.HandleRequest(request)
-	err = sendResponse(grpcStream, response)
+	// set request uid for debug purposes
+	response.withRequestUid(request.GetKulyData().GetRequestUid())
+	err = send(grpcStream, response)
 	return err
 }
