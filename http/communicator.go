@@ -16,6 +16,7 @@ type HttpCommunicator struct {
 
 func NewHttpCommunicator(endpoints []*protoCommon.Endpoint) *HttpCommunicator {
 	communicator := &HttpCommunicator{}
+	// choose the first reachable endpoint from the list
 	for _, endpoint := range endpoints {
 		componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
 		if err == nil {
@@ -33,9 +34,11 @@ func (communicator *HttpCommunicator) ProcessRequest(ctx context.Context, reques
 	if err != nil {
 		return nil, err
 	}
-	err = sendRequest(grpcStream, request)
+	err = send(grpcStream, request)
 	if err != nil {
 		return nil, err
 	}
-	return receiveResponse(grpcStream)
+	response := newEmptyHttpResponse()
+	err = receive(grpcStream, response)
+	return response, err
 }
