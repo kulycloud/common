@@ -1,129 +1,105 @@
 package http
 
 import (
+	"errors"
 	protoHttp "github.com/kulycloud/protocol/http"
 )
 
-// http-intermediate <-> stream
+var ErrConversionError = errors.New("error during conversion")
 
-func newRequestFromStream(reqStream <-chan *protoHttp.RequestChunk) *HttpRequest {
-	request := newRequestFromChunk(<-reqStream)
-	for {
-		bodyChunk, ok := <-reqStream
-		if ok {
-			request.Append(bodyChunk.GetBodyChunk())
-		} else {
-			break
-		}
+// request
+
+func (request *HttpRequest) fromChunk(chunk *protoHttp.Chunk) error {
+	request.requestHeader = chunk.GetHeader().GetRequestHeader()
+	if request.requestHeader == nil {
+		return ErrConversionError
 	}
-	return request
+	return nil
 }
 
-func newStreamFromRequest(request *HttpRequest) <-chan *protoHttp.RequestChunk {
-	var reqStream = make(chan *protoHttp.RequestChunk)
+func (request *HttpRequest) toChunk() *protoHttp.Chunk {
+	return &protoHttp.Chunk{
+		Content: &protoHttp.Chunk_Header{
+			Header: &protoHttp.Header{
+				Content: &protoHttp.Header_RequestHeader{
+					RequestHeader: request.requestHeader,
+				},
+			},
+		},
+	}
+}
+
+// response
+
+func (response *HttpResponse) fromChunk(chunk *protoHttp.Chunk) error {
+	response.responseHeader = chunk.GetHeader().GetResponseHeader()
+	if response.responseHeader == nil {
+		return ErrConversionError
+	}
+	return nil
+}
+
+func (response *HttpResponse) toChunk() *protoHttp.Chunk {
+	return &protoHttp.Chunk{
+		Content: &protoHttp.Chunk_Header{
+			Header: &protoHttp.Header{
+				Content: &protoHttp.Header_ResponseHeader{
+					ResponseHeader: response.responseHeader,
+				},
+			},
+		},
+	}
+}
+
+// body
+
+func (bs ByteSlice) toChunk() *protoHttp.Chunk {
+	return &protoHttp.Chunk{
+		Content: &protoHttp.Chunk_BodyChunk{
+			BodyChunk: bs,
+		},
+	}
+}
+
+func (bw *bodyWorker) setStream(stream grpcStream) {
+	bw.connectedToStream = true
 	go func() {
-		reqStream <- newGrpcRequestHeaderChunk(request)
 		for {
-			bodyChunk, ok := <-request.GetBody()
-			if ok {
-				reqStream <- newGrpcRequestBodyChunk(bodyChunk)
-			} else {
+			chunk, err := stream.Recv()
+			if err != nil {
+				close(bw.recvChannel)
 				break
 			}
+			bw.recvChannel <- chunk
 		}
-		close(reqStream)
 	}()
-	return reqStream
 }
 
-func newResponseFromStream(resStream <-chan *protoHttp.ResponseChunk) *HttpResponse {
-	response := newResponseFromChunk(<-resStream)
-	for {
-		bodyChunk, ok := <-resStream
-		if ok {
-			response.Append(bodyChunk.GetBodyChunk())
-		} else {
-			break
-		}
-	}
-	return response
-}
-
-func newStreamFromResponse(response *HttpResponse) <-chan *protoHttp.ResponseChunk {
-	var resStream = make(chan *protoHttp.ResponseChunk)
+func (bw *bodyWorker) toStream() {
 	go func() {
-		resStream <- newGrpcResponseHeaderChunk(response)
+		// parse buffer
+		i := 0
+		length := len(bw.buffer)
 		for {
-			bodyChunk, ok := <-response.GetBody()
-			if ok {
-				resStream <- newGrpcResponseBodyChunk(bodyChunk)
-			} else {
+			j := i + MAX_CHUNK_SIZE
+			if j >= length {
 				break
 			}
+			bw.sendChannel <- ByteSlice(bw.buffer[i:j]).toChunk()
+			i = j
 		}
-		close(resStream)
+		bw.sendChannel <- ByteSlice(bw.buffer[i:]).toChunk()
+
+		// propagate remaining packages
+		if bw.connectedToStream {
+			for {
+				chunk, ok := <-bw.recvChannel
+				if !ok {
+					break
+				}
+				bw.sendChannel <- chunk
+			}
+		}
+		close(bw.sendChannel)
 	}()
-	return resStream
-}
-
-// http-intermediate -> grpc chunks
-
-func newGrpcRequestHeaderChunk(request *HttpRequest) *protoHttp.RequestChunk {
-	return &protoHttp.RequestChunk{
-		Content: &protoHttp.RequestChunk_Header{
-			Header: request.RequestHeader,
-		},
-	}
-}
-
-func newGrpcRequestBodyChunk(bodyChunk []byte) *protoHttp.RequestChunk {
-	return &protoHttp.RequestChunk{
-		Content: &protoHttp.RequestChunk_BodyChunk{
-			BodyChunk: bodyChunk,
-		},
-	}
-}
-
-func newGrpcResponseHeaderChunk(response *HttpResponse) *protoHttp.ResponseChunk {
-	return &protoHttp.ResponseChunk{
-		Content: &protoHttp.ResponseChunk_Header{
-			Header: response.ResponseHeader,
-		},
-	}
-}
-
-func newGrpcResponseBodyChunk(bodyChunk []byte) *protoHttp.ResponseChunk {
-	return &protoHttp.ResponseChunk{
-		Content: &protoHttp.ResponseChunk_BodyChunk{
-			BodyChunk: bodyChunk,
-		},
-	}
-}
-
-// grpc chunk -> http-intermediate
-
-func newRequestFromChunk(requestChunk *protoHttp.RequestChunk) *HttpRequest {
-	request := &HttpRequest{}
-	request.NewBody()
-	if requestChunk != nil {
-		request.RequestHeader = requestChunk.GetHeader()
-	}
-	return request
-}
-
-func newRequestBodyChunk(requestChunk *protoHttp.RequestChunk) []byte {
-	return requestChunk.GetBodyChunk()
-}
-
-func newResponseFromChunk(responseChunk *protoHttp.ResponseChunk) *HttpResponse {
-	response := &HttpResponse{}
-	response.NewBody()
-	if responseChunk != nil {
-		response.ResponseHeader = responseChunk.GetHeader()
-	}
-	return response
-}
-
-func newResponseBodyChunk(responseChunk *protoHttp.ResponseChunk) []byte {
-	return responseChunk.GetBodyChunk()
 }
