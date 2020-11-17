@@ -30,7 +30,7 @@ func NewHttpCommunicator(endpoints []*protoCommon.Endpoint) *HttpCommunicator {
 }
 
 func (communicator *HttpCommunicator) ProcessRequest(ctx context.Context, request *HttpRequest) (*HttpResponse, error) {
-	grpcStream, err := communicator.httpClient.ProcessRequest(ctx)
+	grpcStream, err := communicator.Stream(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,11 @@ func (communicator *HttpCommunicator) ProcessRequest(ctx context.Context, reques
 	if err != nil {
 		return nil, err
 	}
-	response := newEmptyHttpResponse()
+	response := &HttpResponse{Body: NewBody()}
 	err = receive(grpcStream, response)
 	return response, err
+}
+
+func (communicator *HttpCommunicator) Stream(ctx context.Context) (protoHttp.Http_ProcessRequestClient, error) {
+	return communicator.httpClient.ProcessRequest(ctx)
 }

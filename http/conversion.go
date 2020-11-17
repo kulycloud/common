@@ -61,45 +61,47 @@ func (bs ByteSlice) toChunk() *protoHttp.Chunk {
 	}
 }
 
-func (bw *bodyWorker) setStream(stream grpcStream) {
+func (bw *bodyWorker) connectStream(stream grpcStream) {
 	bw.connectedToStream = true
 	go func() {
 		for {
 			chunk, err := stream.Recv()
 			if err != nil {
-				close(bw.recvChannel)
+				close(bw.backlog)
 				break
 			}
-			bw.recvChannel <- chunk
+			bw.backlog <- chunk
 		}
 	}()
 }
 
-func (bw *bodyWorker) toStream() {
+func (bw *bodyWorker) toStream() <-chan *protoHttp.Chunk {
+	sendChannel := make(chan *protoHttp.Chunk, 1)
 	go func() {
 		// parse buffer
 		i := 0
 		length := len(bw.buffer)
 		for {
-			j := i + MAX_CHUNK_SIZE
+			j := i + MaxChunkSize
 			if j >= length {
 				break
 			}
-			bw.sendChannel <- ByteSlice(bw.buffer[i:j]).toChunk()
+			sendChannel <- ByteSlice(bw.buffer[i:j]).toChunk()
 			i = j
 		}
-		bw.sendChannel <- ByteSlice(bw.buffer[i:]).toChunk()
+		sendChannel <- ByteSlice(bw.buffer[i:]).toChunk()
 
 		// propagate remaining packages
 		if bw.connectedToStream {
 			for {
-				chunk, ok := <-bw.recvChannel
+				chunk, ok := <-bw.backlog
 				if !ok {
 					break
 				}
-				bw.sendChannel <- chunk
+				sendChannel <- chunk
 			}
 		}
-		close(bw.sendChannel)
+		close(sendChannel)
 	}()
+	return sendChannel
 }

@@ -1,71 +1,68 @@
 package http
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/textproto"
+	"strings"
 
 	protoHttp "github.com/kulycloud/protocol/http"
 )
 
-const MAX_CHUNK_SIZE = 4096
+const MaxChunkSize = 4 << 10
 
 var ErrBodyTooSmall = errors.New("body does not contain number of bytes requested")
 
-// handler interface
-type HttpHandler interface {
-	HandleRequest(*HttpRequest) *HttpResponse
-}
+// handler function
+type HandlerFunc func(*HttpRequest) *HttpResponse
 
 // type aliasing to hide in structs
 type requestHeader = protoHttp.RequestHeader
 type responseHeader = protoHttp.ResponseHeader
 
-// request/response
+// HttpRequest
 type HttpRequest struct {
 	*requestHeader
 	Body *bodyWorker
 }
 
+func NewHttpRequest() *HttpRequest {
+	return &HttpRequest{
+		requestHeader: &requestHeader{
+			HttpData: &protoHttp.RequestHeader_HttpData{
+				Headers: make(Headers),
+			},
+			KulyData:    &protoHttp.RequestHeader_KulyData{},
+			ServiceData: make(ServiceData),
+		},
+		Body: NewBody(),
+	}
+}
+
+// HttpResponse
 type HttpResponse struct {
 	*responseHeader
 	Body *bodyWorker
 }
 
-func newEmptyHttpRequest() *HttpRequest {
-	return &HttpRequest{
-		Body: newBodyWorker(),
-	}
-}
-
-func newEmptyHttpResponse() *HttpResponse {
-	return &HttpResponse{
-		Body: newBodyWorker(),
-	}
-
-}
-
 func NewHttpResponse() *HttpResponse {
-	response := newEmptyHttpResponse()
-	response.responseHeader = &protoHttp.ResponseHeader{
-		Status:     200,
-		Headers:    make(map[string]string),
-		RequestUid: "not set",
+	return &HttpResponse{
+		responseHeader: &responseHeader{
+			Status:     200,
+			Headers:    make(Headers),
+			RequestUid: "not set",
+		},
+		Body: NewBody(),
 	}
-	return response
 }
 
-func (response *HttpResponse) WithStatus(status int32) *HttpResponse {
-	response.Status = status
-	return response
+func (response *HttpResponse) SetStatus(status int) {
+	response.Status = int32(status)
 }
 
-func (response *HttpResponse) WithHeader(key string, value string) *HttpResponse {
-	response.Headers[key] = value
-	return response
-}
-
-func (response *HttpResponse) withRequestUid(requestUid string) *HttpResponse {
+func (response *HttpResponse) setRequestUid(requestUid string) {
 	response.RequestUid = requestUid
-	return response
 }
 
 // grpc
@@ -78,7 +75,7 @@ type grpcStream interface {
 type chunkable interface {
 	fromChunk(*protoHttp.Chunk) error
 	toChunk() *protoHttp.Chunk
-	// this is not pleasent but simplifies parsing
+	// this is not pleasant but simplifies parsing
 	getBody() *bodyWorker
 }
 
@@ -90,50 +87,97 @@ func (response *HttpResponse) getBody() *bodyWorker {
 	return response.Body
 }
 
-// body
+// Headers
+// headers are stored in a map[string]string
+// in contrast to the way the net/http package stores them (map[string][]string)
+// the values of the header are stored in a string separated by semicolons
+type Headers map[string]string
+
+func (h Headers) Set(key string, value string) {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	h[key] = value
+}
+
+func (h Headers) Add(key string, value string) {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	if len(h[key]) > 0 {
+		h[key] = value
+	} else {
+		h[key] = fmt.Sprintf("%s;%s", h[key], value)
+	}
+}
+
+// 	get returns the whole value of the header, not just the first part
+// 	if you only want the first value, use GetValues()[0]
+func (h Headers) Get(key string) string {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	return h[key]
+}
+
+func (h Headers) GetValues(key string) []string {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	return strings.Split(h[key], ";")
+}
+
+func (h Headers) SetValues(key string, values []string) {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	h[key] = strings.Join(values, ";")
+}
+
+// Service Data
+
+type ServiceData map[string]string
+
+// ByteSlice
 type ByteSlice []byte
 
-/*
+func (bs ByteSlice) String() string {
+	return string(bs)
+}
+
+func (bs ByteSlice) Unmarshal(result interface{}) error {
+	return json.Unmarshal(bs, result)
+}
+
+/* bodyWorker
 The concept of the bodyWorker is to lazy load the
 body contents from a stream.
 If the body is streamed only the loaded parts of
 the body have to be converted back into chunks.
 The remaining packets in the receiving stream
-are forewarded to the send stream.
+are forwarded to the send stream.
 
 - connectedToStream is a necessary flag because
   a body can exist without a receiving stream
   i.e. a newly created response
-- recvChannel is filled with packets from the
+- backlog is filled with packets from the
   connected grpc stream after the
-  setStream method is called
+  connectStream method is called
 - sendStream is filled with the buffered body
-  and the remaining packets in the recvChannel
+  and the remaining packets in the backlog
   after the toStream method is called
 - buffer contains the part of the body that has
   been loaded
 */
 type bodyWorker struct {
 	connectedToStream bool
-	recvChannel       chan *protoHttp.Chunk
-	sendChannel       chan *protoHttp.Chunk
+	backlog           chan *protoHttp.Chunk
 	buffer            ByteSlice
 }
 
-func newBodyWorker() *bodyWorker {
+func NewBody() *bodyWorker {
 	return &bodyWorker{
 		connectedToStream: false,
-		recvChannel:       make(chan *protoHttp.Chunk, 1),
-		sendChannel:       make(chan *protoHttp.Chunk, 1),
-		buffer:            make(ByteSlice, 0, MAX_CHUNK_SIZE),
+		backlog:           make(chan *protoHttp.Chunk, 1),
+		buffer:            make(ByteSlice, 0, MaxChunkSize),
 	}
 }
 
-// lazy load from recvChannel until buffer contains numberOfBytes
+// lazy load from backlog until buffer contains numberOfBytes
 func (bw *bodyWorker) Read(numberOfBytes int) (ByteSlice, error) {
 	for len(bw.buffer) < numberOfBytes || numberOfBytes == -1 {
 		if bw.connectedToStream {
-			chunk, ok := <-bw.recvChannel
+			chunk, ok := <-bw.backlog
 			if !ok {
 				return bw.buffer, ErrBodyTooSmall
 			}
@@ -174,7 +218,7 @@ func (bw *bodyWorker) ReadAllAtOffset(offset int) (ByteSlice, error) {
 func (bw *bodyWorker) clearBacklog() {
 	if bw.connectedToStream {
 		for {
-			_, ok := <-bw.recvChannel
+			_, ok := <-bw.backlog
 			if !ok {
 				break
 			}
@@ -182,9 +226,14 @@ func (bw *bodyWorker) clearBacklog() {
 	}
 }
 
-func (bw *bodyWorker) Write(content ByteSlice) {
+func (bw *bodyWorker) Write(content []byte) {
 	bw.clearBacklog()
 	bw.buffer = content
+}
+
+func (bw *bodyWorker) Append(content []byte) {
+	_ = bw.ReadAll()
+	bw.buffer = append(bw.buffer, content...)
 }
 
 func (bw *bodyWorker) Clear() {

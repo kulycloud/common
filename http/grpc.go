@@ -13,7 +13,7 @@ func receive(stream grpcStream, object chunkable) error {
 	if err != nil {
 		return err
 	}
-	object.getBody().setStream(stream)
+	object.getBody().connectStream(stream)
 	return nil
 }
 
@@ -22,9 +22,9 @@ func send(stream grpcStream, object chunkable) error {
 	if err != nil {
 		return err
 	}
-	object.getBody().toStream()
+	bodyStream := object.getBody().toStream()
 	for {
-		chunk, ok := <-object.getBody().sendChannel
+		chunk, ok := <-bodyStream
 		if !ok {
 			break
 		}

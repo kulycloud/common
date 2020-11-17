@@ -1,39 +1,69 @@
 package http
 
 import (
+	"fmt"
 	"github.com/kulycloud/common/communication"
+	commonCommunication "github.com/kulycloud/common/communication"
 	"github.com/kulycloud/common/logging"
 	protoHttp "github.com/kulycloud/protocol/http"
 )
 
-var _ protoHttp.HttpServer = &HttpServer{}
+var _ protoHttp.HttpServer = &httpHandler{}
 
-var logger = logging.GetForComponent("server")
+var logger = logging.GetForComponent("http")
 
-type HttpServer struct {
+type httpHandler struct {
 	protoHttp.UnimplementedHttpServer
-	handler HttpHandler
+	handlerFunc HandlerFunc
 }
 
-func NewHttpServer(handler HttpHandler) *HttpServer {
-	return &HttpServer{
-		handler: handler,
+type HttpServer struct {
+	handler  *httpHandler
+	listener *commonCommunication.Listener
+}
+
+func newHttpHandler(handlerFunc HandlerFunc) *httpHandler {
+	return &httpHandler{
+		handlerFunc: handlerFunc,
 	}
 }
 
-func (server *HttpServer) Register(listener *communication.Listener) {
+func (server *httpHandler) Register(listener *communication.Listener) {
 	protoHttp.RegisterHttpServer(listener.Server, server)
 }
 
-func (server *HttpServer) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
-	request := newEmptyHttpRequest()
+func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
+	request := &HttpRequest{Body: NewBody()}
 	err := receive(grpcStream, request)
 	if err != nil {
 		return err
 	}
-	response := server.handler.HandleRequest(request)
+	response := server.handlerFunc(request)
 	// set request uid for debug purposes
-	response.withRequestUid(request.GetKulyData().GetRequestUid())
+	response.setRequestUid(request.GetKulyData().GetRequestUid())
 	err = send(grpcStream, response)
 	return err
+}
+
+func NewHttpServer(httpPort uint32, handlerFunc HandlerFunc) *HttpServer {
+	listener := commonCommunication.NewListener(logging.GetForComponent("listener"))
+	err := listener.Setup(httpPort)
+	if err != nil {
+		logger.Errorw("error during http listener setup", "error", err)
+		return nil
+	}
+	handler := newHttpHandler(handlerFunc)
+	handler.Register(listener)
+	server := &HttpServer{
+		handler:  handler,
+		listener: listener,
+	}
+	return server
+}
+
+func (hs *HttpServer) Serve() error {
+	if hs == nil {
+		return fmt.Errorf("could not create server")
+	}
+	return hs.listener.Serve()
 }
