@@ -17,22 +17,73 @@ var ErrBodyTooSmall = errors.New("body does not contain number of bytes requeste
 // handler function
 type HandlerFunc func(*Request) *Response
 
-// type aliasing to hide in structs
-type requestHeader = protoHttp.RequestHeader
-type responseHeader = protoHttp.ResponseHeader
+/* Difference between grpc and intermediate header
+
+// Request
+protoHttp.RequestHeader:
+    HttpData:
+        Method
+        Path
+        Headers
+        Source
+
+    KulyData:
+        RouteUid
+        StepUid
+        Step
+        RequestUid
+
+    ServiceData
+
+RequestHeader
+    Method
+    Path
+    Headers (type Headers)
+    Source
+
+    KulyData (pointer to raw grpc)
+
+    ServiceData (type ServiceData)
+
+// Response
+protoHttp.ResponseHeader:
+    Status
+    Headers
+    RequestUid
+
+ResponseHeader"
+    Status (type int)
+    Headers (type Headers)
+    RequestUid
+*/
+
+type requestHeader struct {
+	Method  string
+	Path    string
+	Headers Headers
+	Source  string
+
+	KulyData *protoHttp.RequestHeader_KulyData
+
+	ServiceData ServiceData
+}
+
+type responseHeader struct {
+	Status     int
+	Headers    Headers
+	RequestUid string
+}
 
 // Request
 type Request struct {
 	*requestHeader
-	Body *bodyWorker
+	Body *body
 }
 
 func NewRequest() *Request {
 	return &Request{
 		requestHeader: &requestHeader{
-			HttpData: &protoHttp.RequestHeader_HttpData{
-				Headers: make(Headers),
-			},
+			Headers:     make(Headers),
 			KulyData:    &protoHttp.RequestHeader_KulyData{},
 			ServiceData: make(ServiceData),
 		},
@@ -43,7 +94,7 @@ func NewRequest() *Request {
 // Response
 type Response struct {
 	*responseHeader
-	Body *bodyWorker
+	Body *body
 }
 
 func NewResponse() *Response {
@@ -57,14 +108,6 @@ func NewResponse() *Response {
 	}
 }
 
-func (response *Response) SetStatus(status int) {
-	response.Status = int32(status)
-}
-
-func (response *Response) setRequestUid(requestUid string) {
-	response.RequestUid = requestUid
-}
-
 // grpc
 
 type grpcStream interface {
@@ -76,14 +119,14 @@ type chunkable interface {
 	fromChunk(*protoHttp.Chunk) error
 	toChunk() *protoHttp.Chunk
 	// this is not pleasant but simplifies parsing
-	getBody() *bodyWorker
+	getBody() *body
 }
 
-func (request *Request) getBody() *bodyWorker {
+func (request *Request) getBody() *body {
 	return request.Body
 }
 
-func (response *Response) getBody() *bodyWorker {
+func (response *Response) getBody() *body {
 	return response.Body
 }
 
@@ -139,8 +182,8 @@ func (bs ByteSlice) Unmarshal(result interface{}) error {
 	return json.Unmarshal(bs, result)
 }
 
-/* bodyWorker
-The concept of the bodyWorker is to lazy load the
+/* body
+The concept of the body is to lazy load the
 body contents from a stream.
 If the body is streamed only the loaded parts of
 the body have to be converted back into chunks.
@@ -159,14 +202,14 @@ are forwarded to the send stream.
 - buffer contains the part of the body that has
   been loaded
 */
-type bodyWorker struct {
+type body struct {
 	connectedToStream bool
 	backlog           chan *protoHttp.Chunk
 	buffer            ByteSlice
 }
 
-func NewBody() *bodyWorker {
-	return &bodyWorker{
+func NewBody() *body {
+	return &body{
 		connectedToStream: false,
 		backlog:           make(chan *protoHttp.Chunk, 1),
 		buffer:            make(ByteSlice, 0, MaxChunkSize),
@@ -174,7 +217,7 @@ func NewBody() *bodyWorker {
 }
 
 // lazy load from backlog until buffer contains numberOfBytes
-func (bw *bodyWorker) Read(numberOfBytes int) (ByteSlice, error) {
+func (bw *body) Read(numberOfBytes int) (ByteSlice, error) {
 	for len(bw.buffer) < numberOfBytes || numberOfBytes == -1 {
 		if bw.connectedToStream {
 			chunk, ok := <-bw.backlog
@@ -190,7 +233,7 @@ func (bw *bodyWorker) Read(numberOfBytes int) (ByteSlice, error) {
 }
 
 // lazy load offset+numberOfBytes bytes from stream and return from offset
-func (bw *bodyWorker) ReadAtOffset(numberOfBytes int, offset int) (ByteSlice, error) {
+func (bw *body) ReadAtOffset(numberOfBytes int, offset int) (ByteSlice, error) {
 	bs, err := bw.Read(offset + numberOfBytes)
 	if err != nil {
 		if len(bs) > offset {
@@ -201,12 +244,12 @@ func (bw *bodyWorker) ReadAtOffset(numberOfBytes int, offset int) (ByteSlice, er
 	return bs[offset:], err
 }
 
-func (bw *bodyWorker) ReadAll() ByteSlice {
+func (bw *body) ReadAll() ByteSlice {
 	bs, _ := bw.Read(-1)
 	return bs
 }
 
-func (bw *bodyWorker) ReadAllAtOffset(offset int) (ByteSlice, error) {
+func (bw *body) ReadAllAtOffset(offset int) (ByteSlice, error) {
 	bs := bw.ReadAll()
 	if len(bs) > offset {
 		return bs[offset:], nil
@@ -215,7 +258,7 @@ func (bw *bodyWorker) ReadAllAtOffset(offset int) (ByteSlice, error) {
 }
 
 // clear out receiving stream
-func (bw *bodyWorker) clearBacklog() {
+func (bw *body) clearBacklog() {
 	if bw.connectedToStream {
 		for {
 			_, ok := <-bw.backlog
@@ -226,16 +269,16 @@ func (bw *bodyWorker) clearBacklog() {
 	}
 }
 
-func (bw *bodyWorker) Write(content []byte) {
+func (bw *body) Write(content []byte) {
 	bw.clearBacklog()
 	bw.buffer = content
 }
 
-func (bw *bodyWorker) Append(content []byte) {
+func (bw *body) Append(content []byte) {
 	_ = bw.ReadAll()
 	bw.buffer = append(bw.buffer, content...)
 }
 
-func (bw *bodyWorker) Clear() {
+func (bw *body) Clear() {
 	bw.Write(ByteSlice{})
 }

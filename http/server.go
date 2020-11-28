@@ -33,14 +33,14 @@ func (server *httpHandler) Register(listener *communication.Listener) {
 }
 
 func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
-	request := &Request{Body: NewBody()}
+	request := NewRequest()
 	err := receive(grpcStream, request)
 	if err != nil {
 		return err
 	}
 	response := server.handlerFunc(request)
 	// set request uid for debug purposes
-	response.setRequestUid(request.GetKulyData().GetRequestUid())
+	response.RequestUid = request.KulyData.GetRequestUid()
 	err = send(grpcStream, response)
 	return err
 }

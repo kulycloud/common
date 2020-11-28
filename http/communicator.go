@@ -38,7 +38,7 @@ func (communicator *Communicator) ProcessRequest(ctx context.Context, request *R
 	if err != nil {
 		return nil, err
 	}
-	response := &Response{Body: NewBody()}
+	response := NewResponse()
 	err = receive(grpcStream, response)
 	return response, err
 }

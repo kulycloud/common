@@ -10,10 +10,27 @@ var ErrConversionError = errors.New("error during conversion")
 // request
 
 func (request *Request) fromChunk(chunk *protoHttp.Chunk) error {
-	request.requestHeader = chunk.GetHeader().GetRequestHeader()
-	if request.requestHeader == nil {
+	// check if all necessary parts are set
+	header := chunk.GetHeader().GetRequestHeader()
+	if header == nil {
 		return ErrConversionError
 	}
+	httpData := header.HttpData
+	kulyData := header.KulyData
+	serviceData := header.ServiceData
+	if httpData == nil || kulyData == nil || serviceData == nil {
+		return ErrConversionError
+	}
+
+	request.Method = httpData.Method
+	request.Path = httpData.Path
+	request.Headers = httpData.Headers
+	request.Source = httpData.Source
+
+	request.KulyData = kulyData
+
+	request.ServiceData = serviceData
+
 	return nil
 }
 
@@ -22,7 +39,16 @@ func (request *Request) toChunk() *protoHttp.Chunk {
 		Content: &protoHttp.Chunk_Header{
 			Header: &protoHttp.Header{
 				Content: &protoHttp.Header_RequestHeader{
-					RequestHeader: request.requestHeader,
+					RequestHeader: &protoHttp.RequestHeader{
+						HttpData: &protoHttp.RequestHeader_HttpData{
+							Method:  request.Method,
+							Path:    request.Path,
+							Headers: request.Headers,
+							Source:  request.Source,
+						},
+						KulyData:    request.KulyData,
+						ServiceData: request.ServiceData,
+					},
 				},
 			},
 		},
@@ -32,10 +58,15 @@ func (request *Request) toChunk() *protoHttp.Chunk {
 // response
 
 func (response *Response) fromChunk(chunk *protoHttp.Chunk) error {
-	response.responseHeader = chunk.GetHeader().GetResponseHeader()
-	if response.responseHeader == nil {
+	header := chunk.GetHeader().GetResponseHeader()
+	if header == nil {
 		return ErrConversionError
 	}
+
+	response.Status = (int)(header.Status)
+	response.Headers = header.Headers
+	response.RequestUid = header.RequestUid
+
 	return nil
 }
 
@@ -44,7 +75,11 @@ func (response *Response) toChunk() *protoHttp.Chunk {
 		Content: &protoHttp.Chunk_Header{
 			Header: &protoHttp.Header{
 				Content: &protoHttp.Header_ResponseHeader{
-					ResponseHeader: response.responseHeader,
+					ResponseHeader: &protoHttp.ResponseHeader{
+						Status:     (int32)(response.Status),
+						Headers:    response.Headers,
+						RequestUid: response.RequestUid,
+					},
 				},
 			},
 		},
@@ -61,7 +96,7 @@ func (bs ByteSlice) toChunk() *protoHttp.Chunk {
 	}
 }
 
-func (bw *bodyWorker) connectStream(stream grpcStream) {
+func (bw *body) connectStream(stream grpcStream) {
 	bw.connectedToStream = true
 	go func() {
 		for {
@@ -75,7 +110,7 @@ func (bw *bodyWorker) connectStream(stream grpcStream) {
 	}()
 }
 
-func (bw *bodyWorker) toStream() <-chan *protoHttp.Chunk {
+func (bw *body) toStream() <-chan *protoHttp.Chunk {
 	sendChannel := make(chan *protoHttp.Chunk, 1)
 	go func() {
 		// parse buffer
