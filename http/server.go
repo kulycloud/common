@@ -17,7 +17,7 @@ type httpHandler struct {
 	handlerFunc HandlerFunc
 }
 
-type HttpServer struct {
+type Server struct {
 	handler  *httpHandler
 	listener *commonCommunication.Listener
 }
@@ -33,7 +33,7 @@ func (server *httpHandler) Register(listener *communication.Listener) {
 }
 
 func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
-	request := &HttpRequest{Body: NewBody()}
+	request := &Request{Body: NewBody()}
 	err := receive(grpcStream, request)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessReque
 	return err
 }
 
-func NewHttpServer(httpPort uint32, handlerFunc HandlerFunc) *HttpServer {
+func NewServer(httpPort uint32, handlerFunc HandlerFunc) *Server {
 	listener := commonCommunication.NewListener(logging.GetForComponent("listener"))
 	err := listener.Setup(httpPort)
 	if err != nil {
@@ -54,14 +54,14 @@ func NewHttpServer(httpPort uint32, handlerFunc HandlerFunc) *HttpServer {
 	}
 	handler := newHttpHandler(handlerFunc)
 	handler.Register(listener)
-	server := &HttpServer{
+	server := &Server{
 		handler:  handler,
 		listener: listener,
 	}
 	return server
 }
 
-func (hs *HttpServer) Serve() error {
+func (hs *Server) Serve() error {
 	if hs == nil {
 		return fmt.Errorf("could not create server")
 	}

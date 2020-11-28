@@ -9,7 +9,7 @@ var ErrConversionError = errors.New("error during conversion")
 
 // request
 
-func (request *HttpRequest) fromChunk(chunk *protoHttp.Chunk) error {
+func (request *Request) fromChunk(chunk *protoHttp.Chunk) error {
 	request.requestHeader = chunk.GetHeader().GetRequestHeader()
 	if request.requestHeader == nil {
 		return ErrConversionError
@@ -17,7 +17,7 @@ func (request *HttpRequest) fromChunk(chunk *protoHttp.Chunk) error {
 	return nil
 }
 
-func (request *HttpRequest) toChunk() *protoHttp.Chunk {
+func (request *Request) toChunk() *protoHttp.Chunk {
 	return &protoHttp.Chunk{
 		Content: &protoHttp.Chunk_Header{
 			Header: &protoHttp.Header{
@@ -31,7 +31,7 @@ func (request *HttpRequest) toChunk() *protoHttp.Chunk {
 
 // response
 
-func (response *HttpResponse) fromChunk(chunk *protoHttp.Chunk) error {
+func (response *Response) fromChunk(chunk *protoHttp.Chunk) error {
 	response.responseHeader = chunk.GetHeader().GetResponseHeader()
 	if response.responseHeader == nil {
 		return ErrConversionError
@@ -39,7 +39,7 @@ func (response *HttpResponse) fromChunk(chunk *protoHttp.Chunk) error {
 	return nil
 }
 
-func (response *HttpResponse) toChunk() *protoHttp.Chunk {
+func (response *Response) toChunk() *protoHttp.Chunk {
 	return &protoHttp.Chunk{
 		Content: &protoHttp.Chunk_Header{
 			Header: &protoHttp.Header{

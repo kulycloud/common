@@ -15,20 +15,20 @@ const MaxChunkSize = 4 << 10
 var ErrBodyTooSmall = errors.New("body does not contain number of bytes requested")
 
 // handler function
-type HandlerFunc func(*HttpRequest) *HttpResponse
+type HandlerFunc func(*Request) *Response
 
 // type aliasing to hide in structs
 type requestHeader = protoHttp.RequestHeader
 type responseHeader = protoHttp.ResponseHeader
 
-// HttpRequest
-type HttpRequest struct {
+// Request
+type Request struct {
 	*requestHeader
 	Body *bodyWorker
 }
 
-func NewHttpRequest() *HttpRequest {
-	return &HttpRequest{
+func NewRequest() *Request {
+	return &Request{
 		requestHeader: &requestHeader{
 			HttpData: &protoHttp.RequestHeader_HttpData{
 				Headers: make(Headers),
@@ -40,14 +40,14 @@ func NewHttpRequest() *HttpRequest {
 	}
 }
 
-// HttpResponse
-type HttpResponse struct {
+// Response
+type Response struct {
 	*responseHeader
 	Body *bodyWorker
 }
 
-func NewHttpResponse() *HttpResponse {
-	return &HttpResponse{
+func NewResponse() *Response {
+	return &Response{
 		responseHeader: &responseHeader{
 			Status:     200,
 			Headers:    make(Headers),
@@ -57,11 +57,11 @@ func NewHttpResponse() *HttpResponse {
 	}
 }
 
-func (response *HttpResponse) SetStatus(status int) {
+func (response *Response) SetStatus(status int) {
 	response.Status = int32(status)
 }
 
-func (response *HttpResponse) setRequestUid(requestUid string) {
+func (response *Response) setRequestUid(requestUid string) {
 	response.RequestUid = requestUid
 }
 
@@ -79,11 +79,11 @@ type chunkable interface {
 	getBody() *bodyWorker
 }
 
-func (request *HttpRequest) getBody() *bodyWorker {
+func (request *Request) getBody() *bodyWorker {
 	return request.Body
 }
 
-func (response *HttpResponse) getBody() *bodyWorker {
+func (response *Response) getBody() *bodyWorker {
 	return response.Body
 }
 

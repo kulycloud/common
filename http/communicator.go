@@ -7,15 +7,15 @@ import (
 	protoHttp "github.com/kulycloud/protocol/http"
 )
 
-var _ communication.RemoteComponent = &HttpCommunicator{}
+var _ communication.RemoteComponent = &Communicator{}
 
-type HttpCommunicator struct {
+type Communicator struct {
 	communication.ComponentCommunicator
 	httpClient protoHttp.HttpClient
 }
 
-func NewHttpCommunicator(endpoints []*protoCommon.Endpoint) *HttpCommunicator {
-	communicator := &HttpCommunicator{}
+func NewCommunicator(endpoints []*protoCommon.Endpoint) *Communicator {
+	communicator := &Communicator{}
 	// choose the first reachable endpoint from the list
 	for _, endpoint := range endpoints {
 		componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
@@ -29,7 +29,7 @@ func NewHttpCommunicator(endpoints []*protoCommon.Endpoint) *HttpCommunicator {
 	return nil
 }
 
-func (communicator *HttpCommunicator) ProcessRequest(ctx context.Context, request *HttpRequest) (*HttpResponse, error) {
+func (communicator *Communicator) ProcessRequest(ctx context.Context, request *Request) (*Response, error) {
 	grpcStream, err := communicator.Stream(ctx)
 	if err != nil {
 		return nil, err
@@ -38,11 +38,11 @@ func (communicator *HttpCommunicator) ProcessRequest(ctx context.Context, reques
 	if err != nil {
 		return nil, err
 	}
-	response := &HttpResponse{Body: NewBody()}
+	response := &Response{Body: NewBody()}
 	err = receive(grpcStream, response)
 	return response, err
 }
 
-func (communicator *HttpCommunicator) Stream(ctx context.Context) (protoHttp.Http_ProcessRequestClient, error) {
+func (communicator *Communicator) Stream(ctx context.Context) (protoHttp.Http_ProcessRequestClient, error) {
 	return communicator.httpClient.ProcessRequest(ctx)
 }
