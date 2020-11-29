@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"github.com/kulycloud/common/communication"
 	protoCommon "github.com/kulycloud/protocol/common"
 	protoHttp "github.com/kulycloud/protocol/http"
@@ -14,11 +15,15 @@ type Communicator struct {
 	httpClient protoHttp.HttpClient
 }
 
+var ErrNoSuitableEndpoint = errors.New("no suitable endpoint found")
+
 func NewCommunicatorFromEndpoint(endpoint *protoCommon.Endpoint) (*Communicator, error) {
-	communicator := &Communicator{}
 	componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
 	if err == nil {
-		if err = componentCommunicator.Ping(context.Background()); err == nil {
+		communicator := &Communicator{
+			ComponentCommunicator: *componentCommunicator,
+		}
+		if err = communicator.Ping(context.Background()); err == nil {
 			communicator.httpClient = protoHttp.NewHttpClient(componentCommunicator.GrpcClient)
 			return communicator, nil
 		}
@@ -26,15 +31,15 @@ func NewCommunicatorFromEndpoint(endpoint *protoCommon.Endpoint) (*Communicator,
 	return nil, err
 }
 
-func NewCommunicator(endpoints []*protoCommon.Endpoint) *Communicator {
+func NewCommunicator(endpoints []*protoCommon.Endpoint) (*Communicator, error) {
 	// choose the first reachable endpoint from the list
 	for _, endpoint := range endpoints {
 		communicator, err := NewCommunicatorFromEndpoint(endpoint)
 		if err == nil {
-			return communicator
+			return communicator, nil
 		}
 	}
-	return nil
+	return nil, ErrNoSuitableEndpoint
 }
 
 func (communicator *Communicator) ProcessRequest(ctx context.Context, request *Request) (*Response, error) {

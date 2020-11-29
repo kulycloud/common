@@ -13,12 +13,14 @@ func (request *Request) fromChunk(chunk *protoHttp.Chunk) error {
 	// check if all necessary parts are set
 	header := chunk.GetHeader().GetRequestHeader()
 	if header == nil {
+		logger.Warn("request header in chunk is nil")
 		return ErrConversionError
 	}
 	httpData := header.HttpData
 	kulyData := header.KulyData
 	serviceData := header.ServiceData
 	if httpData == nil || kulyData == nil || serviceData == nil {
+		logger.Warnw("at least one data object is nil", "httpData", httpData, "kulyData", kulyData, "serviceData", serviceData)
 		return ErrConversionError
 	}
 
@@ -60,6 +62,7 @@ func (request *Request) toChunk() *protoHttp.Chunk {
 func (response *Response) fromChunk(chunk *protoHttp.Chunk) error {
 	header := chunk.GetHeader().GetResponseHeader()
 	if header == nil {
+		logger.Warn("response header in chunk is nil")
 		return ErrConversionError
 	}
 
