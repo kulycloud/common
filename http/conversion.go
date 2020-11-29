@@ -18,10 +18,15 @@ func (request *Request) fromChunk(chunk *protoHttp.Chunk) error {
 	}
 	httpData := header.HttpData
 	kulyData := header.KulyData
-	serviceData := header.ServiceData
-	if httpData == nil || kulyData == nil || serviceData == nil {
-		logger.Warnw("at least one data object is nil", "httpData", httpData, "kulyData", kulyData, "serviceData", serviceData)
+
+	if httpData == nil || kulyData == nil {
+		logger.Warnw("at least one data object is nil", "httpData", httpData, "kulyData", kulyData)
 		return ErrConversionError
+	}
+
+	serviceData := header.ServiceData
+	if serviceData == nil {
+		serviceData = make(ServiceData)
 	}
 
 	request.Method = httpData.Method
