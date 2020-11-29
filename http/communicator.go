@@ -14,16 +14,24 @@ type Communicator struct {
 	httpClient protoHttp.HttpClient
 }
 
-func NewCommunicator(endpoints []*protoCommon.Endpoint) *Communicator {
+func NewCommunicatorFromEndpoint(endpoint *protoCommon.Endpoint) (*Communicator, error) {
 	communicator := &Communicator{}
+	componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
+	if err == nil {
+		if err = componentCommunicator.Ping(context.Background()); err == nil {
+			communicator.httpClient = protoHttp.NewHttpClient(componentCommunicator.GrpcClient)
+			return communicator, nil
+		}
+	}
+	return nil, err
+}
+
+func NewCommunicator(endpoints []*protoCommon.Endpoint) *Communicator {
 	// choose the first reachable endpoint from the list
 	for _, endpoint := range endpoints {
-		componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
+		communicator, err := NewCommunicatorFromEndpoint(endpoint)
 		if err == nil {
-			if err = componentCommunicator.Ping(context.Background()); err == nil {
-				communicator.httpClient = protoHttp.NewHttpClient(componentCommunicator.GrpcClient)
-				return communicator
-			}
+			return communicator
 		}
 	}
 	return nil
