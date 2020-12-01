@@ -30,6 +30,7 @@ func (request *Request) fromChunk(chunk *protoHttp.Chunk) error {
 	}
 
 	request.Method = httpData.Method
+	request.Host = httpData.Host
 	request.Path = httpData.Path
 	request.Headers = httpData.Headers
 	request.Source = httpData.Source
@@ -49,6 +50,7 @@ func (request *Request) toChunk() *protoHttp.Chunk {
 					RequestHeader: &protoHttp.RequestHeader{
 						HttpData: &protoHttp.RequestHeader_HttpData{
 							Method:  request.Method,
+							Host:    request.Host,
 							Path:    request.Path,
 							Headers: request.Headers,
 							Source:  request.Source,

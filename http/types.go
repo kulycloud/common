@@ -23,6 +23,7 @@ type HandlerFunc func(*Request) *Response
 protoHttp.RequestHeader:
     HttpData:
         Method
+        Host
         Path
         Headers
         Source
@@ -37,6 +38,7 @@ protoHttp.RequestHeader:
 
 RequestHeader
     Method
+    Host
     Path
     Headers (type Headers)
     Source
@@ -59,6 +61,7 @@ ResponseHeader"
 
 type requestHeader struct {
 	Method  string
+	Host    string
 	Path    string
 	Headers Headers
 	Source  string
