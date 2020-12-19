@@ -17,13 +17,13 @@ type Communicator struct {
 
 var ErrNoSuitableEndpoint = errors.New("no suitable endpoint found")
 
-func NewCommunicatorFromEndpoint(endpoint *protoCommon.Endpoint) (*Communicator, error) {
+func NewCommunicatorFromEndpoint(ctx context.Context, endpoint *protoCommon.Endpoint) (*Communicator, error) {
 	componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
 	if err == nil {
 		communicator := &Communicator{
 			ComponentCommunicator: *componentCommunicator,
 		}
-		if err = communicator.Ping(context.Background()); err == nil {
+		if err = communicator.Ping(ctx); err == nil {
 			communicator.httpClient = protoHttp.NewHttpClient(componentCommunicator.GrpcClient)
 			return communicator, nil
 		}
@@ -31,10 +31,10 @@ func NewCommunicatorFromEndpoint(endpoint *protoCommon.Endpoint) (*Communicator,
 	return nil, err
 }
 
-func NewCommunicator(endpoints []*protoCommon.Endpoint) (*Communicator, error) {
+func NewCommunicator(ctx context.Context, endpoints []*protoCommon.Endpoint) (*Communicator, error) {
 	// choose the first reachable endpoint from the list
 	for _, endpoint := range endpoints {
-		communicator, err := NewCommunicatorFromEndpoint(endpoint)
+		communicator, err := NewCommunicatorFromEndpoint(ctx, endpoint)
 		if err == nil {
 			return communicator, nil
 		}

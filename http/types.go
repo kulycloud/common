@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,7 @@ const MaxChunkSize = 4 << 10
 var ErrBodyTooSmall = errors.New("body does not contain number of bytes requested")
 
 // handler function
-type HandlerFunc func(*Request) *Response
+type HandlerFunc func(context.Context, *Request) *Response
 
 /* Difference between grpc and intermediate header
 
