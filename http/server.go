@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"errors"
 
 	"github.com/kulycloud/common/communication"
