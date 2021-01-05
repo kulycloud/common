@@ -1,42 +1,25 @@
 package http
 
-import (
-	protoHttp "github.com/kulycloud/protocol/http"
-)
-
-func receive(stream grpcStream, object chunkable) error {
+func receive(stream grpcStream, object chunkable) (error, errorChannel) {
 	chunk, err := stream.Recv()
 	if err != nil {
-		return err
+		logger.Errorw("could not receive first chunk", "error", err)
+		return ErrStreamError, nil
 	}
 	err = object.fromChunk(chunk)
 	if err != nil {
-		return err
+		return err, nil
 	}
-	object.getBody().connectStream(stream)
-	return nil
+	done := object.getBody().connectStream(stream)
+	return nil, done
 }
 
-func send(stream grpcStream, object chunkable) error {
+func send(stream grpcStream, object chunkable) (error, errorChannel) {
 	err := stream.Send(object.toChunk())
 	if err != nil {
-		return err
+		logger.Errorw("could not send first chunk", "error", err)
+		return ErrStreamError, nil
 	}
-	bodyStream := object.getBody().toStream()
-	for {
-		chunk, ok := <-bodyStream
-		if !ok {
-			break
-		}
-		err = stream.Send(chunk)
-		if err != nil {
-			return err
-		}
-	}
-	// properly close the send stream if performed by a client
-	clientStream, isClientStream := stream.(protoHttp.Http_ProcessRequestClient)
-	if isClientStream {
-		err = clientStream.CloseSend()
-	}
-	return err
+	done := object.getBody().toStream(stream)
+	return nil, done
 }

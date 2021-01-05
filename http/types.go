@@ -117,6 +117,7 @@ func NewResponse() *Response {
 type grpcStream interface {
 	Send(*protoHttp.Chunk) error
 	Recv() (*protoHttp.Chunk, error)
+	Context() context.Context
 }
 
 type chunkable interface {

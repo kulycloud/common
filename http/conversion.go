@@ -3,9 +3,14 @@ package http
 import (
 	"errors"
 	protoHttp "github.com/kulycloud/protocol/http"
+	"io"
 )
 
 var ErrConversionError = errors.New("error during conversion")
+var ErrRequestClosed = errors.New("request context was closed")
+var ErrStreamError = errors.New("error during http stream")
+
+type errorChannel chan error
 
 // request
 
@@ -106,35 +111,63 @@ func (bs ByteSlice) toChunk() *protoHttp.Chunk {
 	}
 }
 
-func (bw *body) connectStream(stream grpcStream) {
+func (bw *body) connectStream(stream grpcStream) errorChannel {
 	bw.connectedToStream = true
+	errCh := make(errorChannel, 1)
 	go func() {
+		defer func() {
+			close(bw.backlog)
+			close(errCh)
+		}()
 		for {
 			chunk, err := stream.Recv()
 			if err != nil {
-				close(bw.backlog)
+				if !errors.Is(err, io.EOF) {
+					logger.Warnw("error receiving chunk", "error", err)
+					errCh <- err
+				}
 				break
 			}
-			bw.backlog <- chunk
+			select {
+			case bw.backlog <- chunk:
+			case <-stream.Context().Done():
+				logger.Warnw("stream context closed", "error", stream.Context().Err())
+				break
+			}
 		}
 	}()
+	return errCh
 }
 
-func (bw *body) toStream() <-chan *protoHttp.Chunk {
-	sendChannel := make(chan *protoHttp.Chunk, 1)
+func (bw *body) toStream(stream grpcStream) errorChannel {
+	errCh := make(errorChannel)
+	var err error
 	go func() {
+		defer func() {
+			close(errCh)
+		}()
 		// parse buffer
 		i := 0
 		length := len(bw.buffer)
 		for {
 			j := i + MaxChunkSize
 			if j >= length {
+				if length > 0 {
+					err = sendChunk(stream, bw.buffer[i:].toChunk())
+					if err != nil {
+						errCh <- err
+						return
+					}
+				}
 				break
 			}
-			sendChannel <- ByteSlice(bw.buffer[i:j]).toChunk()
+			err = sendChunk(stream, bw.buffer[i:j].toChunk())
+			if err != nil {
+				errCh <- err
+				return
+			}
 			i = j
 		}
-		sendChannel <- ByteSlice(bw.buffer[i:]).toChunk()
 
 		// propagate remaining packages
 		if bw.connectedToStream {
@@ -143,10 +176,55 @@ func (bw *body) toStream() <-chan *protoHttp.Chunk {
 				if !ok {
 					break
 				}
-				sendChannel <- chunk
+				err = sendChunk(stream, chunk)
+				if err != nil {
+					errCh <- err
+					return
+				}
 			}
 		}
-		close(sendChannel)
+		// properly close the send stream if performed by a client
+		clientStream, isClientStream := stream.(protoHttp.Http_ProcessRequestClient)
+		if isClientStream {
+			err = clientStream.CloseSend()
+			if err != nil && !errors.Is(err, io.EOF) {
+				logger.Warnw("could not close stream", "error", err)
+			}
+		}
 	}()
-	return sendChannel
+	return errCh
+}
+
+func sendChunk(stream grpcStream, chunk *protoHttp.Chunk) error {
+	select {
+	case <-stream.Context().Done():
+		logger.Warnw("stream context closed", "error", stream.Context().Err())
+		return ErrRequestClosed
+	default:
+		err := stream.Send(chunk)
+		if err != nil && !errors.Is(err, io.EOF) {
+			logger.Warnw("could not send chunk", "error", err)
+			return ErrStreamError
+		}
+		return nil
+	}
+}
+
+func logErrors(ch errorChannel) {
+	for {
+		err, ok := <-ch
+		if !ok {
+			break
+		}
+		logger.Warnw(ErrStreamError.Error(), "error", err)
+	}
+}
+
+func waitUntilDone(ch errorChannel) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		logErrors(ch)
+	}()
+	<-done
 }

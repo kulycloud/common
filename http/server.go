@@ -37,15 +37,20 @@ func (server *httpHandler) Register(listener *communication.Listener) {
 
 func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
 	request := NewRequest()
-	err := receive(grpcStream, request)
+	err, recvErrs := receive(grpcStream, request)
 	if err != nil {
 		return err
 	}
+	go logErrors(recvErrs)
 	response := server.handlerFunc(grpcStream.Context(), request)
 	// set request uid for debug purposes
 	response.RequestUid = request.KulyData.GetRequestUid()
-	err = send(grpcStream, response)
-	return err
+	err, sendErrs := send(grpcStream, response)
+	if err != nil {
+		return err
+	}
+	waitUntilDone(sendErrs)
+	return nil
 }
 
 func NewServer(httpPort uint32, handlerFunc HandlerFunc) (*Server, error) {

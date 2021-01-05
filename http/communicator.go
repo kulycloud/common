@@ -38,6 +38,7 @@ func NewCommunicator(ctx context.Context, endpoints []*protoCommon.Endpoint) (*C
 		if err == nil {
 			return communicator, nil
 		}
+		logger.Warnw("could not create communicator", "endpoint", endpoint, "error", err)
 	}
 	return nil, ErrNoSuitableEndpoint
 }
@@ -47,13 +48,18 @@ func (communicator *Communicator) ProcessRequest(ctx context.Context, request *R
 	if err != nil {
 		return nil, err
 	}
-	err = send(grpcStream, request)
+	err, sendErrs := send(grpcStream, request)
 	if err != nil {
 		return nil, err
 	}
+	go logErrors(sendErrs)
 	response := NewResponse()
-	err = receive(grpcStream, response)
-	return response, err
+	err, recvErrs := receive(grpcStream, response)
+	if err != nil {
+		return nil, err
+	}
+	go logErrors(recvErrs)
+	return response, nil
 }
 
 func (communicator *Communicator) Stream(ctx context.Context) (protoHttp.Http_ProcessRequestClient, error) {
