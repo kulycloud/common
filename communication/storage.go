@@ -115,6 +115,19 @@ func (communicator *StorageCommunicator) GetRouteStart(ctx context.Context, host
 	return resp, nil
 }
 
+func (communicator *StorageCommunicator) DeleteRoute(ctx context.Context, namespace string, name string) error {
+	_, err := communicator.storageClient.DeleteRoute(ctx, &protoStorage.DeleteRouteRequest{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}})
+
+	if err != nil {
+		return fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return nil
+}
+
 func (communicator *StorageCommunicator) GetService(ctx context.Context, namespace string, name string) (*protoStorage.Service, error) {
 	resp, err := communicator.storageClient.GetService(ctx, &protoStorage.GetServiceRequest{NamespacedName: &protoStorage.NamespacedName{
 		Namespace: namespace,
@@ -169,6 +182,19 @@ func (communicator *StorageCommunicator) SetServiceLBEndpoints(ctx context.Conte
 		Namespace: namespace,
 		Name:      name,
 	}, Endpoints: endpoints})
+
+	if err != nil {
+		return fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return nil
+}
+
+func (communicator *StorageCommunicator) DeleteService(ctx context.Context, namespace string, name string) error {
+	_, err := communicator.storageClient.DeleteService(ctx, &protoStorage.DeleteServiceRequest{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}})
 
 	if err != nil {
 		return fmt.Errorf("error from storage provider: %w", err)
