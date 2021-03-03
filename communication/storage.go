@@ -126,7 +126,7 @@ func (communicator *StorageCommunicator) GetRoutesInNamespace(ctx context.Contex
 		return nil, fmt.Errorf("error from storage provider: %w", err)
 	}
 
-	return resp.Routes, nil
+	return resp.RouteUids, nil
 }
 
 func (communicator *StorageCommunicator) GetRouteStart(ctx context.Context, host string) (*protoStorage.GetRouteStartResponse, error) {
