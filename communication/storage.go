@@ -95,6 +95,30 @@ func (communicator *StorageCommunicator) GetRouteStepByUID(ctx context.Context, 
 	return resp.Step, nil
 }
 
+func (communicator *StorageCommunicator) GetPopulatedRouteStepByNamespacedName(ctx context.Context, namespace string, name string, stepId uint32) (*protoStorage.PopulatedRouteStep, error) {
+	resp, err := communicator.storageClient.GetPopulatedRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_NamespacedName{NamespacedName: &protoStorage.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}}, StepId: stepId})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Step, nil
+}
+
+
+func (communicator *StorageCommunicator) GetPopulatedRouteStepByUID(ctx context.Context, UID string, stepId uint32) (*protoStorage.PopulatedRouteStep, error) {
+	resp, err := communicator.storageClient.GetPopulatedRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
+
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return resp.Step, nil
+}
+
 func (communicator *StorageCommunicator) GetRoutesInNamespace(ctx context.Context, namespace string) ([]string, error) {
 	resp, err := communicator.storageClient.GetRoutesInNamespace(ctx, &protoStorage.GetRoutesInNamespaceRequest{Namespace: namespace})
 
