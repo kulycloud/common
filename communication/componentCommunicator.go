@@ -8,7 +8,7 @@ import (
 )
 
 type ComponentCommunicator struct {
-	Client protoCommon.ComponentClient
+	Client     protoCommon.ComponentClient
 	GrpcClient grpc.ClientConnInterface
 }
 

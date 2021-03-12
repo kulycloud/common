@@ -12,18 +12,18 @@ import (
 type NewStorageHandler func(ctx context.Context, endpoint []*protoCommon.Endpoint)
 
 type Listener struct {
-	Server *grpc.Server
-	Listener net.Listener
-	logger *zap.SugaredLogger
-	Storage *StorageCommunicator
+	Server             *grpc.Server
+	Listener           net.Listener
+	logger             *zap.SugaredLogger
+	Storage            *StorageCommunicator
 	NewStorageHandlers []NewStorageHandler
 }
 
 func NewListener(logger *zap.SugaredLogger) *Listener {
 	return &Listener{
-		logger: logger,
+		logger:             logger,
 		NewStorageHandlers: make([]NewStorageHandler, 0),
-		Storage: NewEmptyStorageCommunicator(),
+		Storage:            NewEmptyStorageCommunicator(),
 	}
 }
 
@@ -35,16 +35,25 @@ func (listener *Listener) Setup(port uint32) error {
 	listener.Listener = lis
 	listener.Server = grpc.NewServer()
 	listener.logger.Infow("created server", "port", port)
-	protoCommon.RegisterComponentServer(listener.Server, &componentHandler{ listener: listener })
+	protoCommon.RegisterComponentServer(listener.Server, &componentHandler{listener: listener})
 	return nil
 }
 
-func (listener *Listener) Serve() error {
-	listener.logger.Infow("serving")
-	return listener.Server.Serve(listener.Listener)
+// Starts server asynchronously
+// caller can decide when to wait for the result
+func (listener *Listener) Serve() <-chan error {
+	errChan := make(chan error)
+	go func() {
+		listener.logger.Infow("serving")
+		err := listener.Server.Serve(listener.Listener)
+		errChan <- err
+		close(errChan)
+	}()
+	return errChan
 }
 
 var _ protoCommon.ComponentServer = &componentHandler{}
+
 type componentHandler struct {
 	protoCommon.UnimplementedComponentServer
 	listener *Listener

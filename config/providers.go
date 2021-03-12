@@ -12,7 +12,8 @@ type Provider interface {
 }
 
 var _ Provider = &EnvironmentVariableProvider{}
-type EnvironmentVariableProvider struct { }
+
+type EnvironmentVariableProvider struct{}
 
 func (envVarProv *EnvironmentVariableProvider) Get(name string) (string, error) {
 	value := os.Getenv(strcase.ToScreamingSnake(name))
@@ -27,7 +28,8 @@ func NewEnvironmentVariableProvider() *EnvironmentVariableProvider {
 }
 
 var _ Provider = &CliParamProvider{}
-type CliParamProvider struct { }
+
+type CliParamProvider struct{}
 
 func (cliProv CliParamProvider) Get(name string) (string, error) {
 	args := os.Args[1:]
@@ -41,8 +43,8 @@ func (cliProv CliParamProvider) Get(name string) (string, error) {
 				}
 			}
 
-			if strings.HasPrefix(flag[2:], name + "=") {
-				return flag[len(name) + 3:], nil
+			if strings.HasPrefix(flag[2:], name+"=") {
+				return flag[len(name)+3:], nil
 			}
 		}
 	}

@@ -70,5 +70,5 @@ func NewServer(httpPort uint32, handlerFunc HandlerFunc) (*Server, error) {
 }
 
 func (hs *Server) Serve() error {
-	return hs.listener.Serve()
+	return <-hs.listener.Serve()
 }
