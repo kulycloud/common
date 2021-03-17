@@ -82,7 +82,7 @@ func (parser *Parser) Populate(config interface{}) error {
 	v := reflect.ValueOf(config).Elem()
 
 	for i := 0; i < v.NumField(); i++ {
-		field :=  v.Type().Field(i)
+		field := v.Type().Field(i)
 		fieldName, ok := field.Tag.Lookup("configName")
 		if !ok {
 			continue

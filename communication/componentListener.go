@@ -12,18 +12,16 @@ import (
 type NewStorageHandler func(ctx context.Context, endpoint []*protoCommon.Endpoint)
 
 type Listener struct {
-	Server *grpc.Server
-	Listener net.Listener
-	logger *zap.SugaredLogger
-	Storage *StorageCommunicator
+	Server             *grpc.Server
+	Listener           net.Listener
+	logger             *zap.SugaredLogger
 	NewStorageHandlers []NewStorageHandler
 }
 
 func NewListener(logger *zap.SugaredLogger) *Listener {
 	return &Listener{
-		logger: logger,
+		logger:             logger,
 		NewStorageHandlers: make([]NewStorageHandler, 0),
-		Storage: NewEmptyStorageCommunicator(),
 	}
 }
 
@@ -35,58 +33,30 @@ func (listener *Listener) Setup(port uint32) error {
 	listener.Listener = lis
 	listener.Server = grpc.NewServer()
 	listener.logger.Infow("created server", "port", port)
-	protoCommon.RegisterComponentServer(listener.Server, &componentHandler{ listener: listener })
+	protoCommon.RegisterComponentServer(listener.Server, &componentHandler{listener: listener})
 	return nil
 }
 
-func (listener *Listener) Serve() error {
-	listener.logger.Infow("serving")
-	return listener.Server.Serve(listener.Listener)
+// Starts server asynchronously
+// caller can decide when to wait for the result
+func (listener *Listener) Serve() <-chan error {
+	errChan := make(chan error)
+	go func() {
+		listener.logger.Infow("serving")
+		err := listener.Server.Serve(listener.Listener)
+		errChan <- err
+		close(errChan)
+	}()
+	return errChan
 }
 
 var _ protoCommon.ComponentServer = &componentHandler{}
+
 type componentHandler struct {
 	protoCommon.UnimplementedComponentServer
 	listener *Listener
 }
 
-func (handler *componentHandler) Ping(ctx context.Context, empty *protoCommon.Empty) (*protoCommon.Empty, error) {
+func (handler *componentHandler) Ping(_ context.Context, _ *protoCommon.Empty) (*protoCommon.Empty, error) {
 	return &protoCommon.Empty{}, nil
-}
-
-func (handler *componentHandler) RegisterStorageEndpoints(ctx context.Context, endpoints *protoCommon.EndpointList) (*protoCommon.Empty, error) {
-	// This logic will change when supporting multiple endpoints (tracked in KU-50)
-	var comm *ComponentCommunicator = nil
-	var err error = nil
-
-	if endpoints.Endpoints != nil && len(endpoints.Endpoints) > 0 {
-		comm, err = NewComponentCommunicatorFromEndpoint(endpoints.Endpoints[0])
-
-		if err == nil {
-			err = comm.Ping(ctx)
-			if err != nil {
-				// We cannot ping the new storage. We should explicitly set it to nil
-				comm = nil
-			}
-		} else {
-			comm = nil
-		}
-	}
-
-	handler.listener.Storage.UpdateComponentCommunicator(comm)
-	handler.listener.Storage.Endpoints = endpoints.Endpoints
-
-	if err == nil {
-		for _, handler := range handler.listener.NewStorageHandlers {
-			handler(ctx, endpoints.Endpoints)
-		}
-	}
-
-	if err != nil {
-		handler.listener.logger.Warnw("Error registering new storage endpoints", "endpoints", endpoints.Endpoints)
-	} else {
-		handler.listener.logger.Infow("Registered new storage endpoints", "endpoints", endpoints.Endpoints)
-	}
-
-	return &protoCommon.Empty{}, err
 }

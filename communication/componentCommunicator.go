@@ -8,7 +8,7 @@ import (
 )
 
 type ComponentCommunicator struct {
-	Client protoCommon.ComponentClient
+	Client     protoCommon.ComponentClient
 	GrpcClient grpc.ClientConnInterface
 }
 
@@ -30,12 +30,6 @@ func (communicator *ComponentCommunicator) Ping(ctx context.Context) error {
 	return err
 }
 
-func (communicator *ComponentCommunicator) RegisterStorageEndpoints(ctx context.Context, endpoints []*protoCommon.Endpoint) error {
-	_, err := communicator.Client.RegisterStorageEndpoints(ctx, &protoCommon.EndpointList{Endpoints: endpoints})
-	return err
-}
-
 type RemoteComponent interface {
 	Ping(ctx context.Context) error
-	RegisterStorageEndpoints(ctx context.Context, endpoints []*protoCommon.Endpoint) error
 }

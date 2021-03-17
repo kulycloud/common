@@ -8,10 +8,11 @@ import (
 )
 
 var _ RemoteComponent = &StorageCommunicator{}
+
 type StorageCommunicator struct {
-	ComponentCommunicator
-	storageClient   protoStorage.StorageClient
-	Endpoints 		[]*protoCommon.Endpoint
+	*ComponentCommunicator
+	storageClient protoStorage.StorageClient
+	Endpoints     []*protoCommon.Endpoint
 }
 
 func NewEmptyStorageCommunicator() *StorageCommunicator {
@@ -19,7 +20,7 @@ func NewEmptyStorageCommunicator() *StorageCommunicator {
 }
 
 func NewStorageCommunicator(componentCommunicator *ComponentCommunicator) *StorageCommunicator {
-	return &StorageCommunicator{ComponentCommunicator: *componentCommunicator, storageClient: protoStorage.NewStorageClient(componentCommunicator.GrpcClient)}
+	return &StorageCommunicator{ComponentCommunicator: componentCommunicator, storageClient: protoStorage.NewStorageClient(componentCommunicator.GrpcClient)}
 }
 
 func (communicator *StorageCommunicator) Ready() bool {
@@ -27,7 +28,8 @@ func (communicator *StorageCommunicator) Ready() bool {
 }
 
 func (communicator *StorageCommunicator) UpdateComponentCommunicator(componentCommunicator *ComponentCommunicator) {
-	communicator.ComponentCommunicator = *componentCommunicator
+	communicator.ComponentCommunicator = componentCommunicator
+
 	if componentCommunicator != nil {
 		communicator.storageClient = protoStorage.NewStorageClient(componentCommunicator.GrpcClient)
 	} else {
@@ -84,7 +86,6 @@ func (communicator *StorageCommunicator) GetRouteStepByNamespacedName(ctx contex
 	return resp.Step, nil
 }
 
-
 func (communicator *StorageCommunicator) GetRouteStepByUID(ctx context.Context, UID string, stepId uint32) (*protoStorage.RouteStep, error) {
 	resp, err := communicator.storageClient.GetRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
 
@@ -107,7 +108,6 @@ func (communicator *StorageCommunicator) GetPopulatedRouteStepByNamespacedName(c
 
 	return resp.Step, nil
 }
-
 
 func (communicator *StorageCommunicator) GetPopulatedRouteStepByUID(ctx context.Context, UID string, stepId uint32) (*protoStorage.PopulatedRouteStep, error) {
 	resp, err := communicator.storageClient.GetPopulatedRouteStep(ctx, &protoStorage.GetRouteStepRequest{Id: &protoStorage.GetRouteStepRequest_Uid{Uid: UID}, StepId: stepId})
@@ -188,7 +188,7 @@ func (communicator *StorageCommunicator) GetServicesInNamespace(ctx context.Cont
 	return resp.Names, nil
 }
 
-func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Context, namespace string, name string,) ([]*protoCommon.Endpoint, error) {
+func (communicator *StorageCommunicator) GetServiceLBEndpoints(ctx context.Context, namespace string, name string) ([]*protoCommon.Endpoint, error) {
 	resp, err := communicator.storageClient.GetServiceLBEndpoints(ctx, &protoStorage.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
