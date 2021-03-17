@@ -22,6 +22,7 @@ type ControlPlaneCommunicator struct {
 	configurationChangedHandlers []ConfigurationChangedHandler
 	clusterChangedHandlers       []ClusterChangedHandler
 	identifier                   string
+	Storage                      *StorageCommunicator
 }
 
 func NewControlPlaneCommunicator() *ControlPlaneCommunicator {
@@ -29,6 +30,16 @@ func NewControlPlaneCommunicator() *ControlPlaneCommunicator {
 		storageChangedHandlers:       make([]StorageChangedHandler, 0),
 		configurationChangedHandlers: make([]ConfigurationChangedHandler, 0),
 		clusterChangedHandlers:       make([]ClusterChangedHandler, 0),
+		Storage:                      NewEmptyStorageCommunicator(),
+	}
+}
+
+func NewControlPlaneCommunicatorWithoutStorage() *ControlPlaneCommunicator {
+	return &ControlPlaneCommunicator{
+		storageChangedHandlers:       make([]StorageChangedHandler, 0),
+		configurationChangedHandlers: make([]ConfigurationChangedHandler, 0),
+		clusterChangedHandlers:       make([]ClusterChangedHandler, 0),
+		Storage:                      nil,
 	}
 }
 
@@ -41,7 +52,7 @@ func (communicator *ControlPlaneCommunicator) Connect(host string, port uint32) 
 	return nil
 }
 
-// Register service asynchronosly
+// Register service asynchronously
 // the returned channel will either receive nil or an error that was encountered during setup, then close the channel
 func (communicator *ControlPlaneCommunicator) RegisterThisService(ctx context.Context, typeName string, ownHost string, ownPort uint32) <-chan error {
 	done := make(chan error)
@@ -83,7 +94,40 @@ func (communicator *ControlPlaneCommunicator) RegisterThisService(ctx context.Co
 				communicator.processEvent(event)
 			}
 		}()
-		done <- nil
+
+		// register for storage events in background if service requires storage events
+		if communicator.Storage != nil {
+			err = communicator.RegisterStorageChangedHandler(func(event *StorageChanged) {
+				// This logic will change when supporting multiple endpoints (tracked in KU-50)
+				var comm *ComponentCommunicator = nil
+				var err error = nil
+
+				if event.Endpoints != nil && len(event.Endpoints) > 0 {
+					comm, err = NewComponentCommunicatorFromEndpoint(event.Endpoints[0])
+
+					if err == nil {
+						err = comm.Ping(ctx)
+						if err != nil {
+							// We cannot ping the new storage. We should explicitly set it to nil
+							comm = nil
+						}
+					} else {
+						comm = nil
+					}
+				}
+
+				communicator.Storage.UpdateComponentCommunicator(comm)
+				communicator.Storage.Endpoints = event.Endpoints
+
+				if err != nil {
+					logger.Warnw("Error registering new storage endpoints", "endpoints", event.Endpoints)
+				} else {
+					logger.Infow("Registered new storage endpoints", "endpoints", event.Endpoints)
+				}
+			})
+		}
+
+		done <- err
 		close(done)
 
 		// keep this background task running until the stream is closed
@@ -133,10 +177,10 @@ func (communicator *ControlPlaneCommunicator) RegisterClusterChangedHandler(hand
 	return nil
 }
 
-// Register to the control plane asynchronosly
+// Register to the control plane asynchronously
 // If it cannot register to the control plane within 5 tries it will panic as it does not make sense to continue running
 // If it does not panic the returned channel will receive a valid *ControlPlaneCommunicator
-func RegisterToControlPlane(typeName string, host string, port uint32, cpHost string, cpPort uint32) <-chan *ControlPlaneCommunicator {
+func RegisterToControlPlane(typeName string, host string, port uint32, cpHost string, cpPort uint32, withStorage bool) <-chan *ControlPlaneCommunicator {
 	communicator := make(chan *ControlPlaneCommunicator)
 
 	go func() {
@@ -145,7 +189,7 @@ func RegisterToControlPlane(typeName string, host string, port uint32, cpHost st
 		numberOfTries := 0
 		for {
 			numberOfTries++
-			controlPlaneComm, err = register(typeName, host, port, cpHost, cpPort)
+			controlPlaneComm, err = register(typeName, host, port, cpHost, cpPort, withStorage)
 			if err == nil || numberOfTries > 5 {
 				break
 			}
@@ -190,8 +234,14 @@ func (communicator *ControlPlaneCommunicator) processEvent(event *protoCommon.Ev
 	}
 }
 
-func register(typeName string, host string, port uint32, cpHost string, cpPort uint32) (*ControlPlaneCommunicator, error) {
-	comm := NewControlPlaneCommunicator()
+func register(typeName string, host string, port uint32, cpHost string, cpPort uint32, withStorage bool) (*ControlPlaneCommunicator, error) {
+	var comm *ControlPlaneCommunicator
+	if withStorage {
+		comm = NewControlPlaneCommunicator()
+	} else {
+		comm = NewControlPlaneCommunicatorWithoutStorage()
+	}
+
 	err := comm.Connect(cpHost, cpPort)
 	if err != nil {
 		logger.Errorw("Could not connect to control-plane", "error", err)

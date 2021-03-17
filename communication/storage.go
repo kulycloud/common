@@ -10,7 +10,7 @@ import (
 var _ RemoteComponent = &StorageCommunicator{}
 
 type StorageCommunicator struct {
-	ComponentCommunicator
+	*ComponentCommunicator
 	storageClient protoStorage.StorageClient
 	Endpoints     []*protoCommon.Endpoint
 }
@@ -20,7 +20,7 @@ func NewEmptyStorageCommunicator() *StorageCommunicator {
 }
 
 func NewStorageCommunicator(componentCommunicator *ComponentCommunicator) *StorageCommunicator {
-	return &StorageCommunicator{ComponentCommunicator: *componentCommunicator, storageClient: protoStorage.NewStorageClient(componentCommunicator.GrpcClient)}
+	return &StorageCommunicator{ComponentCommunicator: componentCommunicator, storageClient: protoStorage.NewStorageClient(componentCommunicator.GrpcClient)}
 }
 
 func (communicator *StorageCommunicator) Ready() bool {
@@ -28,7 +28,8 @@ func (communicator *StorageCommunicator) Ready() bool {
 }
 
 func (communicator *StorageCommunicator) UpdateComponentCommunicator(componentCommunicator *ComponentCommunicator) {
-	communicator.ComponentCommunicator = *componentCommunicator
+	communicator.ComponentCommunicator = componentCommunicator
+
 	if componentCommunicator != nil {
 		communicator.storageClient = protoStorage.NewStorageClient(componentCommunicator.GrpcClient)
 	} else {
