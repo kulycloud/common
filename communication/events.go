@@ -42,9 +42,9 @@ func (e *StorageChanged) ToGrpcEvent() *protoCommon.Event {
 
 type ConfigurationChanged protoCommon.ConfigurationChangedEvent
 
-func NewConfigurationChanged(namespace string) *ConfigurationChanged {
+func NewConfigurationChanged(resource *protoCommon.Resource) *ConfigurationChanged {
 	return &ConfigurationChanged{
-		Source: NewResource(namespace),
+		Resource: resource,
 	}
 }
 
@@ -63,9 +63,11 @@ func (e *ConfigurationChanged) ToGrpcEvent() *protoCommon.Event {
 
 type ClusterChanged protoCommon.ClusterChangedEvent
 
-func NewClusterChanged(namespace string) *ClusterChanged {
+func NewClusterChanged(resource *protoCommon.Resource, serviceCount *protoCommon.InstanceCount, loadBalancerCount *protoCommon.InstanceCount) *ClusterChanged {
 	return &ClusterChanged{
-		Source: NewResource(namespace),
+		Resource:          resource,
+		ServiceCount:      serviceCount,
+		LoadBalancerCount: loadBalancerCount,
 	}
 }
 
@@ -88,9 +90,18 @@ type (
 	ClusterChangedHandler       func(*ClusterChanged)
 )
 
-func NewResource(namespace string) *protoCommon.Resource {
+func NewResource(resourceType string, namespace string, name string) *protoCommon.Resource {
 	return &protoCommon.Resource{
+		Type:      resourceType,
 		Namespace: namespace,
+		Name:      name,
+	}
+}
+
+func NewInstanceCount(expected uint32, actual uint32) *protoCommon.InstanceCount {
+	return &protoCommon.InstanceCount{
+		Expected: expected,
+		Actual:   actual,
 	}
 }
 
