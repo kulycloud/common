@@ -1,10 +1,13 @@
 package http
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	protoCommon "github.com/kulycloud/protocol/common"
+	"google.golang.org/grpc"
+	"net"
 
-	"github.com/kulycloud/common/communication"
-	commonCommunication "github.com/kulycloud/common/communication"
 	"github.com/kulycloud/common/logging"
 	protoHttp "github.com/kulycloud/protocol/http"
 )
@@ -22,7 +25,8 @@ type httpHandler struct {
 
 type Server struct {
 	handler  *httpHandler
-	listener *commonCommunication.Listener
+	server   *grpc.Server
+	listener net.Listener
 }
 
 func newHttpHandler(handlerFunc HandlerFunc) *httpHandler {
@@ -31,8 +35,8 @@ func newHttpHandler(handlerFunc HandlerFunc) *httpHandler {
 	}
 }
 
-func (server *httpHandler) Register(listener *communication.Listener) {
-	protoHttp.RegisterHttpServer(listener.Server, server)
+func (server *httpHandler) Ping(_ context.Context, _ *protoCommon.Empty) (*protoCommon.Empty, error) {
+	return &protoCommon.Empty{}, nil
 }
 
 func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessRequestServer) error {
@@ -54,21 +58,32 @@ func (server *httpHandler) ProcessRequest(grpcStream protoHttp.Http_ProcessReque
 }
 
 func NewServer(httpPort uint32, handlerFunc HandlerFunc) (*Server, error) {
-	listener := commonCommunication.NewListener(logging.GetForComponent("listener"))
-	err := listener.Setup(httpPort)
+	handler := newHttpHandler(handlerFunc)
+	server := &Server{
+		handler: handler,
+	}
+	err := server.setup(httpPort, handler)
 	if err != nil {
 		logger.Errorw("error during http listener setup", "error", err)
 		return nil, ErrCouldNotCreateServer
 	}
-	handler := newHttpHandler(handlerFunc)
-	handler.Register(listener)
-	server := &Server{
-		handler:  handler,
-		listener: listener,
-	}
 	return server, nil
 }
 
+func (hs *Server) setup(port uint32, handler *httpHandler) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+	if err != nil {
+		return err
+	}
+	hs.listener = lis
+	hs.server = grpc.NewServer()
+	logger.Infow("created server", "port", port)
+	protoHttp.RegisterHttpServer(hs.server, handler)
+	return nil
+}
+
 func (hs *Server) Serve() error {
-	return <-hs.listener.Serve()
+	logger.Infow("serving")
+	err := hs.server.Serve(hs.listener)
+	return err
 }

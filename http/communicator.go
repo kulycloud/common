@@ -3,6 +3,8 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
+	"google.golang.org/grpc"
 	"sort"
 	"sync"
 	"time"
@@ -15,10 +17,10 @@ import (
 var _ communication.RemoteComponent = &Communicator{}
 
 type Communicator struct {
-	componentCommunicator communication.ComponentCommunicator
-	httpClient            protoHttp.HttpClient
-	metrics               Metrics
-	metricMutex           sync.Mutex
+	grpcClient  grpc.ClientConnInterface
+	httpClient  protoHttp.HttpClient
+	metrics     Metrics
+	metricMutex sync.Mutex
 }
 
 type Metrics struct {
@@ -29,17 +31,18 @@ type Metrics struct {
 var ErrNoSuitableEndpoint = errors.New("no suitable endpoint found")
 
 func NewCommunicatorFromEndpoint(ctx context.Context, endpoint *protoCommon.Endpoint) (*Communicator, error) {
-	componentCommunicator, err := communication.NewComponentCommunicatorFromEndpoint(endpoint)
-	if err == nil {
-		communicator := &Communicator{
-			componentCommunicator: *componentCommunicator,
-		}
-		if err = communicator.Ping(ctx); err == nil {
-			communicator.httpClient = protoHttp.NewHttpClient(componentCommunicator.GrpcClient)
-			return communicator, nil
-		}
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%v", endpoint.Host, endpoint.Port), grpc.WithInsecure())
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection to component: %w", err)
 	}
-	return nil, err
+	communicator := &Communicator{
+		grpcClient: conn,
+		httpClient: protoHttp.NewHttpClient(conn),
+	}
+	if err = communicator.Ping(ctx); err == nil {
+		return communicator, nil
+	}
+	return communicator, err
 }
 
 // Return best communicator for endpoints based on response time
@@ -86,7 +89,7 @@ func (communicator *Communicator) GetMetrics() Metrics {
 
 func (communicator *Communicator) Ping(ctx context.Context) error {
 	start := time.Now()
-	err := communicator.componentCommunicator.Ping(ctx)
+	_, err := communicator.httpClient.Ping(ctx, &protoCommon.Empty{})
 	communicator.setResponseTime(time.Since(start).Milliseconds())
 	return err
 }

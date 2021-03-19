@@ -39,8 +39,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/kulycloud/protocol v0.0.0-20210319003638-857838179fbd h1:MwqabfiYihaCSkR35j63lew+XFAVMWPynteR4E6BUJE=
-github.com/kulycloud/protocol v0.0.0-20210319003638-857838179fbd/go.mod h1:0ew/OZBNjY27vlfb0xrgaTDp/3A5SM6SepXtWUAd8YY=
+github.com/kulycloud/protocol v0.0.0-20210319110729-a279c3f921ba h1:3za5CdetoP554SDCChRiJGB/V4FyK7gWu0bEJEJi3EI=
+github.com/kulycloud/protocol v0.0.0-20210319110729-a279c3f921ba/go.mod h1:0ew/OZBNjY27vlfb0xrgaTDp/3A5SM6SepXtWUAd8YY=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
