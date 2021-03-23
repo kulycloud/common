@@ -226,3 +226,12 @@ func (communicator *StorageCommunicator) DeleteService(ctx context.Context, name
 
 	return nil
 }
+
+func (communicator *StorageCommunicator) GetNamespaces(ctx context.Context) ([]string, error) {
+	ns, err := communicator.storageClient.GetNamespaces(ctx, &protoCommon.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("error from storage provider: %w", err)
+	}
+
+	return ns.Namespaces, nil
+}
